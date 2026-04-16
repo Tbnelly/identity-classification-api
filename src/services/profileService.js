@@ -8,12 +8,22 @@ function getAgeGroup(age) {
   return "senior";
 }
 
+// Helper to clean MongoDB fields from lean() results
+function cleanDoc(doc) {
+  if (!doc) return null;
+  delete doc._id;
+  delete doc.__v;
+  return doc;
+}
+
 async function findProfileByName(name) {
-  return await Profile.findOne({ name: name.toLowerCase() });
+  const profile = await Profile.findOne({ name: name.toLowerCase() }).lean();
+  return cleanDoc(profile);
 }
 
 async function findProfileById(id) {
-  return await Profile.findOne({ id });
+  const profile = await Profile.findOne({ id }).lean();
+  return cleanDoc(profile);
 }
 
 async function createProfile(name, apiData) {
@@ -31,7 +41,8 @@ async function createProfile(name, apiData) {
   });
 
   await profile.save();
-  return profile;
+  const obj = profile.toObject();
+  return cleanDoc(obj);
 }
 
 async function getAllProfiles(filters = {}) {
@@ -49,7 +60,12 @@ async function getAllProfiles(filters = {}) {
     query.age_group = new RegExp(`^${filters.age_group}$`, "i");
   }
 
-  return await Profile.find(query).sort({ created_at: -1 });
+  const profiles = await Profile.find(query)
+    .select("id name gender age age_group country_id -_id")
+    .lean()
+    .sort({ created_at: -1 });
+
+  return profiles.map(cleanDoc);
 }
 
 async function deleteProfileById(id) {
